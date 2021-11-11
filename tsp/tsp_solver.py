@@ -1,9 +1,12 @@
 import random
 from functools import reduce 
+import argparse
+import csv
 
 import tsplib95 
 
-
+log = print
+log = lambda x: None
 class Graph():
     class Edge():
         def __init__(self, graph, src, dst, weight):
@@ -40,6 +43,7 @@ class Graph():
     
 
 class ACO():
+    solution_filename = 'solution.csv'
     class Ant():
         def __init__(self, aco, graph):
             self.aco = aco
@@ -91,10 +95,9 @@ class ACO():
             self.path.append(start_node)
             
 
-    def __init__(self, num_ants, evaporation_rate, pheromone_inc, alpha, beta, selection_probability):
+    def __init__(self, num_ants, evaporation_rate, alpha, beta, selection_probability):
         self.num_ants = num_ants
         self.evaporation_rate = evaporation_rate
-        self.pheromone_inc = pheromone_inc
         self.alpha = alpha
         self.beta = beta
         self.selection_probability = selection_probability
@@ -114,6 +117,12 @@ class ACO():
 
     def _add_pheromone(self, edges, cost):
         [edge.set_pheromone(edge.pheromone + 1 / cost) for edge in edges]
+    
+    def _save_solution(self, best_path, csv_filename):
+        with open(csv_filename, 'w', newline='') as f:
+            writer = csv.writer(f)
+            for node in best_path[:-1]: # ?
+                writer.writerow([str(node+1)])
         
     def optimize(self, graph, num_iter, stop_iter=None):
         stop_iter = num_iter / 2 if stop_iter is None else stop_iter
@@ -124,7 +133,7 @@ class ACO():
         unchanged_cnt = 0
         ants = [self.Ant(self, graph) for _ in range(self.num_ants)]
         for i in range(num_iter):
-            print(f"Iteration {i}")
+            log(f"Iteration {i}")
             best_iter_fitness = float('inf')
             for ant_no, ant in enumerate(ants):
                 start_node = random.choice(graph.nodes)
@@ -138,43 +147,47 @@ class ACO():
                     best_path = ant.path
                     best_edges = ant.edges
                     best_fitness = fitness
+                    self._save_solution(best_path, self.solution_filename)
+                    with open('fitness.txt', 'w') as f:
+                        f.write(str(best_fitness))
                 if fitness < best_iter_fitness:
                     best_iter_fitness = fitness
                     
-                self._add_pheromone(ant.edges, fitness)
-                print(f"Ant {ant_no} end", end=' ')
-            print('')
+            self._add_pheromone(ant.edges, fitness)
             if best_iter_fitness == best_fitness:
                 unchanged_cnt += 1
                 if unchanged_cnt > stop_iter:
-                    print(f"Stopped")
                     break
             else:
                 unchanged_cnt = 0
             self._evaporate(sum(graph.edges, []))
             self._add_pheromone(best_edges, best_fitness)
             self._update_importance(graph.edges)
-            print(f'Best cost: {best_fitness: .1f} path: {best_path}')
-
-
-                
-                
-
-
+            log(f'Best cost: {best_fitness: .2f} path: {best_path}')
+        return best_fitness, best_path
 
 def main():
-    aco = ACO(50, 0.1, 2, 1, 1, 0.1)
-    #prob = tsplib95.load('bays29.tsp')
-    prob = tsplib95.load('rl11849.tsp')
-    print('Problem loaded')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('tsp_filename', type=str, help="TSP file name ex) dj38.tsp")
+    parser.add_argument('-p', type=int, default=50, help="Population size")
+    parser.add_argument('-f', type=int, default=500, help="The total number of fitness evaluations")
+    args = parser.parse_args()
+    num_ants = args.p
+    num_iter = args.f
+    tsp_filename = args.tsp_filename
+
+    aco = ACO(num_ants, 0.1, 10, 10, 0.1)
+    prob = tsplib95.load(tsp_filename)
+    log('Problem loaded')
     matrix = [
         [ prob.get_weight(src, dst) for dst in range(1, prob.dimension + 1)]
         for src in range(1, prob.dimension + 1) ]
-    print('Matrix is converted')
+    log('Matrix is converted')
     del prob
     graph = Graph(matrix)
     del matrix
-    aco.optimize(graph, 1000, 1000)
+    best_fitness, best_path = aco.optimize(graph, num_iter, None)
+    print(f"{best_fitness:.2f}")
 
 if __name__ == "__main__":
     main()
