@@ -67,7 +67,7 @@ class ACO():
                 next_edge = max(edges, key=lambda x: x.importance)
             else:
                 sum_importances = sum(map(lambda y: y.importance, edges))
-                [edge.set_probability(edge.importance / sum_importances) for edge in edges]
+                [edge.set_probability(edge.importance / sum_importances if sum_importances else 1) for edge in edges]
                 probabilities = [edge.probability for edge in edges]
                 next_edge = random.choices(edges, weights=probabilities, k=1)[0]
             return next_edge 
@@ -148,12 +148,10 @@ class ACO():
                     best_edges = ant.edges
                     best_fitness = fitness
                     self._save_solution(best_path, self.solution_filename)
-                    with open('fitness.txt', 'w') as f:
-                        f.write(str(best_fitness))
                 if fitness < best_iter_fitness:
                     best_iter_fitness = fitness
                     
-            self._add_pheromone(ant.edges, fitness)
+                self._add_pheromone(ant.edges, fitness)
             if best_iter_fitness == best_fitness:
                 unchanged_cnt += 1
                 if unchanged_cnt > stop_iter:
@@ -163,7 +161,7 @@ class ACO():
             self._evaporate(sum(graph.edges, []))
             self._add_pheromone(best_edges, best_fitness)
             self._update_importance(graph.edges)
-            log(f'Best cost: {best_fitness: .2f} path: {best_path}')
+            log(f'Best cost: {best_fitness: .0f} path: {best_path}')
         return best_fitness, best_path
 
 def main():
@@ -187,7 +185,7 @@ def main():
     graph = Graph(matrix)
     del matrix
     best_fitness, best_path = aco.optimize(graph, num_iter, None)
-    print(f"{best_fitness:.2f}")
+    print(f"{best_fitness:.0f}")
 
 if __name__ == "__main__":
     main()
